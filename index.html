@@ -6,21 +6,33 @@
     <title>고래상어 시계</title>
     <style>
         body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            background-color: #000; 
-            margin: 0;
-            overflow: hidden; 
+            overflow: hidden;
         }
 
-        /* 1080 x 1920 픽셀로 고정된 컨테이너 */
+        /* 실제 브라우저 화면에 맞춰 비율을 축소/확대할 래퍼 */
+        .clock-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 내부는 항상 1080x1920 픽셀로 고정하여 계산 오류 원천 차단 */
         .clock-container {
             position: relative;
             width: 1080px;
             height: 1920px;
-            flex-shrink: 0; 
+            transform-origin: center center;
+            /* JS에서 transform: scale()을 통해 크기 조정 */
         }
 
         .track {
@@ -34,20 +46,18 @@
         .dot {
             position: absolute;
             border-radius: 50%;
-            background-color: #333; 
+            background-color: #333;
             transition: background-color 0.1s, box-shadow 0.1s;
         }
 
-        /* 점 크기 및 중앙 정렬 여백 보정 */
-        .dot.sec { width: 20px; height: 20px; margin: -10px 0 0 -10px; } 
-        .dot.min { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; } 
-        .dot.hr  { width: 10px;  height: 10px;  margin: -5px 0 0 -5px; } 
+        .dot.sec { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+        .dot.min { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; }
+        .dot.hr  { width: 10px;  height: 10px;  margin: -5px 0 0 -5px; }
 
         .dot.sec.active { background-color: #64b5f6; box-shadow: 0 0 12px #64b5f6; }
         .dot.min.active { background-color: #81c784; box-shadow: 0 0 10px #81c784; }
         .dot.hr.active  { background-color: #ff8a80; box-shadow: 0 0 6px #ff8a80; }
 
-        /* SVG 렌더링 오류 방지: 완전히 없애지 않고 화면 밖으로 치움 */
         #hidden-svg-container {
             position: absolute;
             top: -9999px;
@@ -62,116 +72,4 @@
 <body>
 
 <div id="hidden-svg-container">
-    <svg id="_레이어_2" data-name="레이어 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 363.98 483.29">
-        <path class="cls-1" d="M254.6,53.32s90.68,7.53,101.27,122.82c10.59,115.29,9.41,180-10.59,228.24s-31.19,66.82-62.35,74.12c-16.24,3.8-44.71-27.06-44.71-27.06,0,0-31.33,15.86-40.66,23.15-5.43,4.25-24.28,14.12-53.65-.56-29.36-14.68-78.05-45.57-112.94-121.41-26.52-57.64-22.59-93.74-22.59-93.74,0,0,3.25-29.85,4.38-38.32s2.4-16.18-5.17-32.84c-11.25-24.76-6.55-34.45,10.96-44.61s29.18-5.88,44.61-28.24c12.38-17.93,52.52-42.35,59.29-46.31s24.85-10.16,24.85-10.16c0,0,10.07-3.06,6.78-6.97-4.05-4.81-20.33-24.09-22.59-29.74s-6.21-16.38,10.16-19.76,49.13,14.12,49.13,14.12c0,0,20.33,12.42,35.58,6.21s21.46-11.86,31.06-2.26c9.6,9.6,9.46,21.22-2.82,33.32Z"/>
-    </svg>
-</div>
-
-<div class="clock-container">
-    <div class="track" id="hr-track"></div>
-    <div class="track" id="min-track"></div>
-    <div class="track" id="sec-track"></div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        function setupPaths() {
-            const svgContainer = document.getElementById('hidden-svg-container');
-            const mainPath = svgContainer.querySelector('path');
-            
-            if (!mainPath) return false;
-
-            const totalLength = mainPath.getTotalLength();
-            const bbox = mainPath.getBBox();
-            
-            // 크기 계산 실패 시 방어 코드
-            if (bbox.width === 0 || bbox.height === 0) return false;
-
-            const cx = bbox.x + bbox.width / 2;
-            const cy = bbox.y + bbox.height / 2; 
-
-            const container = document.querySelector('.clock-container');
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-
-            // 스케일 계산 (컨테이너 가로폭의 95% 사용)
-            const scaleToFit = (containerWidth * 0.95) / bbox.width;
-
-            function generateTrackPoints(trackId, count, depthScale, className) {
-                const track = document.getElementById(trackId);
-                track.innerHTML = ''; 
-
-                for (let i = 0; i < count; i++) {
-                    const pt = mainPath.getPointAtLength((i / count) * totalLength);
-
-                    let x = pt.x - cx;
-                    let y = pt.y - cy; 
-
-                    x = x * scaleToFit * depthScale;
-                    y = y * scaleToFit * depthScale;
-
-                    x = x + (containerWidth / 2);
-                    y = y + (containerHeight / 2);
-
-                    const dot = document.createElement('div');
-                    dot.className = `dot ${className}`;
-                    dot.style.left = `${x}px`;
-                    dot.style.top = `${y}px`;
-                    track.appendChild(dot);
-                }
-            }
-
-            generateTrackPoints('sec-track', 60, 1.0, 'sec');
-            generateTrackPoints('min-track', 60, 0.70, 'min');
-            generateTrackPoints('hr-track', 24, 0.50, 'hr');
-
-            return true;
-        }
-
-        function illuminateDots(trackId, currentValue) {
-            const track = document.getElementById(trackId);
-            if (!track) return;
-            const dots = track.children;
-
-            for (let i = 0; i < dots.length; i++) {
-                if (i <= currentValue) {
-                    dots[i].classList.add('active');
-                } else {
-                    dots[i].classList.remove('active');
-                }
-            }
-        }
-
-        function updateClock() {
-            const now = new Date();
-            const s = now.getSeconds();
-            const m = now.getMinutes();
-            const h = now.getHours(); 
-
-            illuminateDots('sec-track', s);
-            illuminateDots('min-track', m);
-            illuminateDots('hr-track', h);
-        }
-
-        // 초기 실행: 실패 시 0.5초 뒤 재시도
-        if (!setupPaths()) {
-            setTimeout(() => {
-                if(setupPaths()) {
-                    updateClock();
-                    setInterval(updateClock, 1000);
-                }
-            }, 500);
-        } else {
-            updateClock();
-            setInterval(updateClock, 1000);
-        }
-
-        window.addEventListener('resize', () => {
-            setupPaths();
-            updateClock();
-        });
-    });
-</script>
-
-</body>
-</html>
+    <svg id="_레이
