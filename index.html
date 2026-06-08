@@ -72,4 +72,124 @@
 <body>
 
 <div id="hidden-svg-container">
-    <svg id="_레이
+    <svg id="_레이어_2" data-name="레이어 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 363.98 483.29">
+        <path class="cls-1" d="M254.6,53.32s90.68,7.53,101.27,122.82c10.59,115.29,9.41,180-10.59,228.24s-31.19,66.82-62.35,74.12c-16.24,3.8-44.71-27.06-44.71-27.06,0,0-31.33,15.86-40.66,23.15-5.43,4.25-24.28,14.12-53.65-.56-29.36-14.68-78.05-45.57-112.94-121.41-26.52-57.64-22.59-93.74-22.59-93.74,0,0,3.25-29.85,4.38-38.32s2.4-16.18-5.17-32.84c-11.25-24.76-6.55-34.45,10.96-44.61s29.18-5.88,44.61-28.24c12.38-17.93,52.52-42.35,59.29-46.31s24.85-10.16,24.85-10.16c0,0,10.07-3.06,6.78-6.97-4.05-4.81-20.33-24.09-22.59-29.74s-6.21-16.38,10.16-19.76,49.13,14.12,49.13,14.12c0,0,20.33,12.42,35.58,6.21s21.46-11.86,31.06-2.26c9.6,9.6,9.46,21.22-2.82,33.32Z"/>
+    </svg>
+</div>
+
+<div class="clock-wrapper">
+    <div class="clock-container">
+        <div class="track" id="hr-track"></div>
+        <div class="track" id="min-track"></div>
+        <div class="track" id="sec-track"></div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.querySelector('.clock-container');
+        const BASE_WIDTH = 1080;
+        const BASE_HEIGHT = 1920;
+
+        // 화면 크기에 맞춰 스케일 조정 (1080x1920 비율 고정)
+        function adjustScale() {
+            const scaleX = window.innerWidth / BASE_WIDTH;
+            const scaleY = window.innerHeight / BASE_HEIGHT;
+            const scale = Math.min(scaleX, scaleY); // 가로, 세로 중 더 꽉 차는 쪽에 맞춤
+            container.style.transform = `scale(${scale})`;
+        }
+
+        function setupPaths() {
+            const svgContainer = document.getElementById('hidden-svg-container');
+            const mainPath = svgContainer.querySelector('path');
+            
+            if (!mainPath) return false;
+
+            const totalLength = mainPath.getTotalLength();
+            const bbox = mainPath.getBBox();
+            
+            if (bbox.width === 0 || bbox.height === 0) return false;
+
+            const cx = bbox.x + bbox.width / 2;
+            const cy = bbox.y + bbox.height / 2; 
+
+            // 1080px 기준 가로폭의 95% 사용
+            const scaleToFit = (BASE_WIDTH * 0.95) / bbox.width;
+
+            function generateTrackPoints(trackId, count, depthScale, className) {
+                const track = document.getElementById(trackId);
+                track.innerHTML = ''; 
+
+                for (let i = 0; i < count; i++) {
+                    const pt = mainPath.getPointAtLength((i / count) * totalLength);
+
+                    let x = pt.x - cx;
+                    let y = pt.y - cy; 
+
+                    x = x * scaleToFit * depthScale;
+                    y = y * scaleToFit * depthScale;
+
+                    x = x + (BASE_WIDTH / 2);
+                    y = y + (BASE_HEIGHT / 2);
+
+                    const dot = document.createElement('div');
+                    dot.className = `dot ${className}`;
+                    dot.style.left = `${x}px`;
+                    dot.style.top = `${y}px`;
+                    track.appendChild(dot);
+                }
+            }
+
+            generateTrackPoints('sec-track', 60, 1.0, 'sec');
+            generateTrackPoints('min-track', 60, 0.70, 'min');
+            generateTrackPoints('hr-track', 24, 0.50, 'hr');
+
+            return true;
+        }
+
+        function illuminateDots(trackId, currentValue) {
+            const track = document.getElementById(trackId);
+            if (!track) return;
+            const dots = track.children;
+
+            for (let i = 0; i < dots.length; i++) {
+                if (i <= currentValue) {
+                    dots[i].classList.add('active');
+                } else {
+                    dots[i].classList.remove('active');
+                }
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const s = now.getSeconds();
+            const m = now.getMinutes();
+            const h = now.getHours(); 
+
+            illuminateDots('sec-track', s);
+            illuminateDots('min-track', m);
+            illuminateDots('hr-track', h);
+        }
+
+        // 창 크기가 바뀔 때마다 스케일(축소/확대) 비율만 재계산
+        adjustScale();
+        window.addEventListener('resize', adjustScale);
+
+        // 점 렌더링 및 시계 구동
+        if (!setupPaths()) {
+            setTimeout(() => {
+                if(setupPaths()) {
+                    updateClock();
+                    setInterval(updateClock, 1000);
+                }
+            }, 500);
+        } else {
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+    });
+</script>
+
+</body>
+</html>
