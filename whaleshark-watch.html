@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고래상어 시계</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000; 
+            margin: 0;
+            overflow: hidden; /* 화면 밖으로 삐져나가는 요소 숨김 */
+        }
+
+        /* 9:16 비율을 유지하는 컨테이너 */
+        .clock-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            aspect-ratio: 9 / 16;
+            max-width: calc(100vh * (9 / 16)); /* 높이 기준으로 9:16 최대 너비 제한 */
+            max-height: 100vh;
+        }
+
+        .track {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .dot {
+            position: absolute;
+            border-radius: 50%;
+            background-color: #333; 
+            transition: background-color 0.1s, box-shadow 0.1s;
+        }
+
+        /* 점 크기 설정 (초가 가장 큼) */
+        .dot.sec { width: 20px; height: 20px; margin: -7px 0 0 -7px; } 
+        .dot.min { width: 15px; height: 15px; margin: -5px 0 0 -5px; } 
+        .dot.hr  { width: 10px;  height: 10px;  margin: -3px 0 0 -3px; } 
+
+        .dot.sec.active { background-color: #64b5f6; box-shadow: 0 0 12px #64b5f6; }
+        .dot.min.active { background-color: #81c784; box-shadow: 0 0 10px #81c784; }
+        .dot.hr.active  { background-color: #ff8a80; box-shadow: 0 0 6px #ff8a80; }
+
+        #hidden-svg-container {
+            position: absolute;
+            width: 0;
+            height: 0;
+            visibility: hidden;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div id="hidden-svg-container">
+    <svg id="_레이어_2" data-name="레이어 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 363.98 483.29">
+        <path class="cls-1" d="M254.6,53.32s90.68,7.53,101.27,122.82c10.59,115.29,9.41,180-10.59,228.24s-31.19,66.82-62.35,74.12c-16.24,3.8-44.71-27.06-44.71-27.06,0,0-31.33,15.86-40.66,23.15-5.43,4.25-24.28,14.12-53.65-.56-29.36-14.68-78.05-45.57-112.94-121.41-26.52-57.64-22.59-93.74-22.59-93.74,0,0,3.25-29.85,4.38-38.32s2.4-16.18-5.17-32.84c-11.25-24.76-6.55-34.45,10.96-44.61s29.18-5.88,44.61-28.24c12.38-17.93,52.52-42.35,59.29-46.31s24.85-10.16,24.85-10.16c0,0,10.07-3.06,6.78-6.97-4.05-4.81-20.33-24.09-22.59-29.74s-6.21-16.38,10.16-19.76,49.13,14.12,49.13,14.12c0,0,20.33,12.42,35.58,6.21s21.46-11.86,31.06-2.26c9.6,9.6,9.46,21.22-2.82,33.32Z"/>
+    </svg>
+</div>
+
+<div class="clock-container">
+    <div class="track" id="hr-track"></div>
+    <div class="track" id="min-track"></div>
+    <div class="track" id="sec-track"></div>
+</div>
+
+<script>
+    function setupPaths() {
+        const svgContainer = document.getElementById('hidden-svg-container');
+        const mainPath = svgContainer.querySelector('path');
+        
+        if (!mainPath) return false;
+
+        const totalLength = mainPath.getTotalLength();
+        const bbox = mainPath.getBBox();
+        
+        // 기준점을 다시 도형의 정중앙으로 복구
+        const cx = bbox.x + bbox.width / 2;
+        const cy = bbox.y + bbox.height / 2; 
+
+        // 9:16 비율 컨테이너의 실제 화면 크기를 가져옴
+        const container = document.querySelector('.clock-container');
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+
+        // 초(가장 외곽)가 9:16 화면의 가로폭(width)을 거의 꽉 채우도록(95%) 스케일 계산
+        const scaleToFit = (containerWidth * 0.95) / bbox.width;
+
+        function generateTrackPoints(trackId, count, depthScale, className) {
+            const track = document.getElementById(trackId);
+            track.innerHTML = ''; 
+
+            for (let i = 0; i < count; i++) {
+                const pt = mainPath.getPointAtLength((i / count) * totalLength);
+
+                let x = pt.x - cx;
+                let y = pt.y - cy; 
+
+                // 화면 스케일에 층별 비율(depthScale) 적용
+                x = x * scaleToFit * depthScale;
+                y = y * scaleToFit * depthScale;
+
+                // 화면 정중앙으로 배치
+                x = x + (containerWidth / 2);
+                y = y + (containerHeight / 2);
+
+                const dot = document.createElement('div');
+                dot.className = `dot ${className}`;
+                dot.style.left = `${x}px`;
+                dot.style.top = `${y}px`;
+                track.appendChild(dot);
+            }
+        }
+
+        // 스케일 간격을 극단적으로 넓힘 (겹침 완벽 방지)
+        // 초: 100% 크기 / 분: 65% 크기 / 시: 35% 크기
+        generateTrackPoints('sec-track', 60, 1.0, 'sec');
+        generateTrackPoints('min-track', 60, 0.70, 'min');
+        generateTrackPoints('hr-track', 24, 0.50, 'hr');
+
+        return true;
+    }
+
+    function illuminateDots(trackId, currentValue) {
+        const track = document.getElementById(trackId);
+        const dots = track.children;
+
+        for (let i = 0; i < dots.length; i++) {
+            if (i <= currentValue) {
+                dots[i].classList.add('active');
+            } else {
+                dots[i].classList.remove('active');
+            }
+        }
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const s = now.getSeconds();
+        const m = now.getMinutes();
+        const h = now.getHours(); 
+
+        illuminateDots('sec-track', s);
+        illuminateDots('min-track', m);
+        illuminateDots('hr-track', h);
+    }
+
+    // 초기 실행
+    if (setupPaths()) {
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
+    // 창 크기가 변할 때마다(9:16 비율이 리사이징 될 때) 점의 위치를 다시 계산
+    window.addEventListener('resize', () => {
+        setupPaths();
+        updateClock();
+    });
+</script>
+
+</body>
+</html>
